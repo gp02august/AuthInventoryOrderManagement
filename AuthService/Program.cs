@@ -1,3 +1,4 @@
+using AuthService.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -7,8 +8,17 @@ using AuthService.Repository.Interfaces;
 using AuthService.Services;
 using AuthService.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File(
+        "Logs/authservice-.log",
+        rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 
@@ -95,6 +105,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 

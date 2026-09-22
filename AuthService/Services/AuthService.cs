@@ -10,11 +10,13 @@ public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IJwtService _jwtService;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(IUserRepository userRepository, IJwtService jwtService)
+    public AuthService(IUserRepository userRepository, IJwtService jwtService, ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _jwtService = jwtService;
+        _logger = logger;
     }
 
     public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto request)
@@ -39,6 +41,10 @@ public class AuthService : IAuthService
         };
 
         var createdUser = await _userRepository.CreateAsync(user);
+
+        _logger.LogInformation(
+            "User {Username} registered successfully.",
+            request.Username);
 
         return new RegisterResponseDto
         {
@@ -74,6 +80,10 @@ public class AuthService : IAuthService
         }
 
         var accessToken = _jwtService.GenerateToken(user);
+
+        _logger.LogInformation(
+            "User {Username} logged in successfully.",
+            request.Username);
 
         return new LoginResponseDto
         {

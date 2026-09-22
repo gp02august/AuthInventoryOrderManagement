@@ -8,10 +8,12 @@ namespace InventoryService.Services;
 public class ProductService : IProductService
 {
     private readonly IProductRepository _productRepository;
+    private readonly ILogger<ProductService> _logger;
 
-    public ProductService(IProductRepository productRepository)
+    public ProductService(IProductRepository productRepository, ILogger<ProductService> logger)
     {
         _productRepository = productRepository;
+        _logger = logger;
     }
 
     public async Task<ProductResponseDto?> GetByIdAsync(Guid productId)
@@ -87,6 +89,11 @@ public class ProductService : IProductService
         var createdProduct =
             await _productRepository.CreateAsync(product);
 
+        _logger.LogInformation(
+            "Product {ProductId} created successfully. ProductName: {ProductName}",
+            createdProduct.ProductId,
+            createdProduct.ProductName);
+
         return MapToResponse(createdProduct);
     }
 
@@ -120,6 +127,10 @@ public class ProductService : IProductService
 
         await _productRepository.UpdateAsync(product);
 
+        _logger.LogInformation(
+            "Product {ProductId} updated successfully.",
+            productId);
+
         return true;
     }
 
@@ -137,6 +148,10 @@ public class ProductService : IProductService
             DateTimeKind.Unspecified);
 
         await _productRepository.UpdateAsync(product);
+
+        _logger.LogInformation(
+            "Product {ProductId} deactivated successfully.",
+            productId);
 
         return true;
     }

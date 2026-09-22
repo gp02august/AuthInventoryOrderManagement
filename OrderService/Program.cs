@@ -9,9 +9,19 @@ using OrderService.Repository;
 using OrderService.Repository.Interfaces;
 using OrderService.Services;
 using OrderService.Services.Interfaces;
+using Serilog;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File(
+        "Logs/orderservice-.log",
+        rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Controllers
 builder.Services.AddControllers();
