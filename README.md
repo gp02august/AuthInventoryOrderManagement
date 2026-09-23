@@ -13,25 +13,89 @@ The services communicate through REST APIs and use JWT-based authentication with
 ## Architecture
 
 ```text
+                         ┌──────────────────────┐
+                         │     AuthService      │
+                         │                      │
+                         │  Register / Login    │
+                         │  JWT / Roles         │
+                         └──────────┬───────────┘
+                                    │
+                                    │ JWT
+                                    ▼
+                         ┌──────────────────────┐
+                         │     Client / User    │
+                         └──────────┬───────────┘
+                                    │
+                       ┌────────────┴────────────┐
+                       │                         │
+                       ▼                         ▼
+              ┌──────────────────┐      ┌──────────────────┐
+              │ InventoryService │◄─────│   OrderService   │
+              │                  │ REST │                  │
+              │ Product CRUD     │      │ Create Orders    │
+              │ Stock Management │      │ My Orders        │
+              │ Pagination       │      │ Cancel Orders    │
+              └────────┬─────────┘      └────────┬─────────┘
+                       │                         │
+                       │                         │
+                       ▼                         ▼
+              ┌──────────────────┐      ┌──────────────────┐
+              │    inventory_db  │      │     order_db     │
+              │                  │      │                  │
+              │    PostgreSQL    │      │    PostgreSQL    │
+              └──────────────────┘      └──────────────────┘
+
                          ┌──────────────────┐
-                         │   AuthService     │
+                         │     auth_db      │
                          │                  │
-                         │ Register / Login │
-                         │ JWT / Roles      │
-                         └────────┬─────────┘
+                         │    PostgreSQL    │
+                         └────────▲─────────┘
                                   │
-                                  │ JWT
-                                  ▼
-┌──────────────────┐       ┌──────────────────┐
-│ InventoryService │◄──────│   OrderService   │
-│                  │ REST  │                  │
-│ Product CRUD     │       │ Create Orders    │
-│ Stock Management │       │ My Orders        │
-│ Pagination       │       │ Cancel Orders    │
-└────────┬─────────┘       └────────┬─────────┘
-         │                          │
-         ▼                          ▼
-  PostgreSQL DB              PostgreSQL DB
+                                  │
+                             AuthService
+```
+
+### Database-per-Service Architecture
+
+```text
+AuthService
+     │
+     ▼
+  auth_db
+(PostgreSQL)
+
+
+InventoryService
+     │
+     ▼
+inventory_db
+(PostgreSQL)
+
+
+OrderService
+     │
+     ▼
+ order_db
+(PostgreSQL)
+```
+
+Each microservice owns and accesses **only its own database**.
+
+```text
+OrderService
+     │
+     │ REST API
+     ▼
+InventoryService
+     │
+     ▼
+inventory_db
+```
+
+`OrderService` does **not** directly access `inventory_db`.
+
+Similarly, `AuthService` does not directly access `inventory_db` or `order_db`.
+
 ```
 
 Each service has its own database and is responsible for its own data.
@@ -78,7 +142,159 @@ dotnet tool install --global dotnet-ef
 
 ---
 
-## Project Structure
+# Setup
+
+Follow these steps when setting up the application from a fresh clone.
+
+## 1. Clone the Repository
+
+Clone the repository and open the solution in Visual Studio.
+
+```bash
+git clone <repository-url>
+```
+
+---
+
+## 2. Create PostgreSQL Databases
+
+Create the following three databases in PostgreSQL:
+
+```sql
+CREATE DATABASE auth_db;
+CREATE DATABASE inventory_db;
+CREATE DATABASE order_db;
+```
+
+Each microservice uses its own database.
+
+```text
+AuthService       → auth_db
+InventoryService  → inventory_db
+OrderService      → order_db
+```
+
+---
+
+## 3. Configure Connection Strings
+
+Update the `appsettings.json` file of each service with your local PostgreSQL credentials.
+
+### AuthService
+
+```json
+"ConnectionStrings": {
+  "DefaultConnection": "Host=localhost;Port=5432;Database=auth_db;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
+}
+```
+
+### InventoryService
+
+```json
+"ConnectionStrings": {
+  "DefaultConnection": "Host=localhost;Port=5432;Database=inventory_db;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
+}
+```
+
+### OrderService
+
+```json
+"ConnectionStrings": {
+  "OrderDb": "Host=localhost;Port=5432;Database=order_db;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
+}
+```
+
+Replace `YOUR_USERNAME` and `YOUR_PASSWORD` with your local PostgreSQL credentials.
+
+---
+
+## 4. Configure JWT Settings
+
+Configure the JWT settings in the service configuration files.
+
+```json
+"Jwt": {
+  "Key": "your-jwt-secret-key",
+  "Issuer": "your-issuer",
+  "Audience": "your-audience"
+}
+```
+
+The `Key`, `Issuer`, and `Audience` values must be consistent across the services that validate the JWT.
+
+Do not commit real database passwords or JWT signing keys to source control.
+
+---
+
+## 5. Apply EF Core Migrations
+
+EF Core migration files are already included in the repository.
+
+After creating the PostgreSQL databases and configuring the connection strings, apply the migrations for each service.
+
+### AuthService
+
+In Visual Studio Package Manager Console, select:
+
+```text
+Default Project: AuthService
+```
+
+Then run:
+
+```powershell
+Update-Database
+```
+
+### InventoryService
+
+Select:
+
+```text
+Default Project: InventoryService
+```
+
+Then run:
+
+```powershell
+Update-Database
+```
+
+### OrderService
+
+Select:
+
+```text
+Default Project: OrderService
+```
+
+Then run:
+
+```powershell
+Update-Database
+```
+
+The migrations automatically create the required tables and database schema.
+
+Manual table creation is not required.
+
+---
+
+## 6. Run the Services
+
+Start all three services:
+
+```text
+AuthService
+InventoryService
+OrderService
+```
+
+All three services should be running simultaneously because `OrderService` communicates with `InventoryService`.
+
+---
+
+# Project Structure
 
 ```text
 AuthInventoryOrderManagement/
@@ -92,6 +308,7 @@ AuthInventoryOrderManagement/
 │   ├── Repository/
 │   ├── Services/
 │   ├── Logs/
+│   ├── Migrations/
 │   ├── Program.cs
 │   └── appsettings.json
 │
@@ -104,6 +321,7 @@ AuthInventoryOrderManagement/
 │   ├── Repository/
 │   ├── Services/
 │   ├── Logs/
+│   ├── Migrations/
 │   ├── Program.cs
 │   └── appsettings.json
 │
@@ -116,6 +334,7 @@ AuthInventoryOrderManagement/
 │   ├── Repository/
 │   ├── Services/
 │   ├── Logs/
+│   ├── Migrations/
 │   ├── Program.cs
 │   └── appsettings.json
 │
@@ -350,11 +569,11 @@ auth_db
 
 InventoryService
     ↓
-inventory database
+inventory_db
 
 OrderService
     ↓
-order database
+order_db
 ```
 
 The services do not directly access another service's database.
@@ -664,3 +883,4 @@ The current implementation includes:
 * File logging configuration
 * Swagger/OpenAPI
 * OrderService → InventoryService REST communication
+* EF Core migrations for all three services
